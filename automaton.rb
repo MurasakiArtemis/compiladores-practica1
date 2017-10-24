@@ -64,7 +64,8 @@ class Automaton
     transitions = [] if error? current_node
     child_result = false
     transitions.each do |transition|
-      child_result ||= process_transition current_node, position, transition
+      result = process_transition current_node, position, transition
+      child_result ||= result
     end
     child_result
   end
