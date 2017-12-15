@@ -23,10 +23,10 @@ class Automaton
 
   def read_file(filename)
     f = File.new filename, 'r'
-    extract_elements_for_array f, :states
+    extract_elements_for_array f, :states, State
     extract_elements_for_array f, :symbols
-    extract_elements_for_array f, :initials
-    extract_elements_for_array f, :finals
+    extract_elements_for_array f, :initials, State
+    extract_elements_for_array f, :finals, State
     extract_transitions f
     process_errors
   end
@@ -35,11 +35,25 @@ class Automaton
     child_result = false
     initials.each do |initial|
       @open = string.split ''
-      initial_node = Node.new @node_counter, nil, State.new(initial), nil
+      initial_node = Node.new @node_counter, nil, initial, nil
       child_result = process_node initial_node, 0
     end
     process_result
     child_result
+  end
+
+  def obtain_transitions(state)
+    @transitions.select do |transition|
+      transition.origin == state
+    end
+  end
+
+  def obtain_symbol_transitions(state, symbol, accept_epsilon = true)
+    @transitions.select do |transition|
+      epsilon = transition.symbol == 'E' && accept_epsilon
+      result = transition.origin == state
+      result && (transition.symbol == symbol || epsilon)
+    end
   end
 
   private
@@ -59,7 +73,7 @@ class Automaton
 
   def process_node(current_node, position)
     symbol = @open.at(position)
-    transitions = obtain_symbol_transitions current_node, symbol
+    transitions = obtain_symbol_transitions current_node.state, symbol
     return process_final current_node if !symbol && final?(current_node.state)
     transitions = [] if error? current_node
     child_result = false
@@ -86,26 +100,12 @@ class Automaton
     Node.new @node_counter, transition, transition.destination, current_node
   end
 
-  def obtain_symbol_transitions(node, symbol)
-    @transitions.select do |transition|
-      result = transition.origin == node.state
-      result && (transition.symbol == symbol || transition.symbol == 'E')
-    end
-  end
-
-  def obtain_transitions(state)
-    @transitions.select do |transition|
-      transition.origin == state
-    end
-  end
-
   def final?(state)
-    @finals.include?(state.name)
+    @finals.include?(state)
   end
 
   def process_errors
     @states.each do |state|
-      state = State.new state
       @errors.push state if determine_error state
     end
   end
@@ -122,8 +122,9 @@ class Automaton
     error && !(final? state)
   end
 
-  def extract_elements_for_array(file, attribute)
+  def extract_elements_for_array(file, attribute, class_name = String)
     file.gets.chomp.split(',').each do |element|
+      element = class_name.new element if class_name != String
       send(attribute).push element
     end
   end
